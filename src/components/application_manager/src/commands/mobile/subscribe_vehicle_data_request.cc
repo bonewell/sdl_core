@@ -255,10 +255,12 @@ void SubscribeVehicleDataRequest::on_event(const event_engine::Event& event) {
 
   const smart_objects::SmartObject& message = event.smart_object();
 
+#ifndef HMI_DBUS_API
   if (hmi_apis::FunctionID::VehicleInfo_SubscribeVehicleData != event.id()) {
     LOG4CXX_ERROR(logger_, "Received unknown event.");
     return;
   }
+#endif  // HMI_DBUS_API
 
   ApplicationSharedPtr app =
       application_manager_.application(CommandRequestImpl::connection_key());

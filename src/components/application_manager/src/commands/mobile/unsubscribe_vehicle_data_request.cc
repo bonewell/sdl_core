@@ -248,10 +248,12 @@ void UnsubscribeVehicleDataRequest::on_event(const event_engine::Event& event) {
 
   const smart_objects::SmartObject& message = event.smart_object();
 
+#ifndef HMI_DBUS_API
   if (hmi_apis::FunctionID::VehicleInfo_UnsubscribeVehicleData != event.id()) {
     LOG4CXX_ERROR(logger_, "Received unknown event.");
     return;
   }
+#endif  // HMI_DBUS_API
 
 #ifdef HMI_DBUS_API
   for (HmiRequests::iterator it = hmi_requests_.begin();

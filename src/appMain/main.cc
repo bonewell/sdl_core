@@ -170,13 +170,17 @@ int32_t main(int32_t argc, char** argv) {
     if (profile_instance.server_address() == kLocalHostAddress) {
       LOG4CXX_INFO(logger_, "Start HMI on localhost");
 
-#ifndef NO_HMI
-      if (!InitHmi(profile_instance.link_to_web_hmi())) {
+      bool hmi_inited = false;
+#ifdef WEB_HMI
+      hmi_inited = InitHmi(profile_instance.link_to_web_hmi());
+#elif QT_HMI
+      hmi_inited = InitHmi();
+#endif
+      if (hmi_inited) {
         LOG4CXX_INFO(logger_, "InitHmi successful");
       } else {
         LOG4CXX_WARN(logger_, "Failed to init HMI");
       }
-#endif  // #ifndef NO_HMI
     }
   }
   // --------------------------------------------------------------------------

@@ -64,6 +64,8 @@ class FordXmlParser:
         param_desc = ParamDesc()
         param_desc.name = param_el.get('name')
         param_desc.type = param_el.get('type')
+        if param_desc.type == 'Double':
+            param_desc.type = 'Float'
         param_desc.enum = False
         param_desc.struct = False
         param_desc.fulltype = param_desc.type
