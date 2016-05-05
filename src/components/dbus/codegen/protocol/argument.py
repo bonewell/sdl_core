@@ -27,7 +27,7 @@ class Argument(Component):
             return fullname
 
     def isBasic(self):
-        return self.info.type in ('Integer', 'String', 'Boolean', 'Float')
+        return self.info.type in ('Integer', 'String', 'Boolean', 'Float', 'Double')
 
     def name(self):
         return self.info.name
@@ -35,6 +35,9 @@ class Argument(Component):
     def type(self):
         if not self.isBasic():
             return self.fulltype()
+        # It's workaround. Float is present as double in source code
+        if self.info.type == 'Double':
+            return 'Float'
         return self.info.type
 
     def interface(self):

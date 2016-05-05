@@ -91,6 +91,7 @@ if (${HMI_DBUS_API})
 endif ()
 if (${QT_HMI})
 # --- Qt HMI
-    add_subdirectory(./qt_hmi)
+# See seporate repository
+#    add_subdirectory(./qt_hmi)
 endif ()
 
