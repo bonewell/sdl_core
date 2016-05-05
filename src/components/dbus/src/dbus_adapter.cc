@@ -509,55 +509,40 @@ bool DBusAdapter::SetValue(
     DBusMessageIter* iter,
     const ford_message_descriptions::ParameterDescription* rules,
     const smart_objects::SmartObject& param) {
-  // LOG4CXX_DEBUG(logger_, "DBus: Set param " << rules->name << " = " <<
-  // param.asString());
-  int type = 0;
-  void* value = 0;
-  dbus_int32_t integerValue = 0;
-  double floatValue = 0;
-  dbus_bool_t booleanValue = false;
-  const char* stringValue;
+//  LOG4CXX_DEBUG(logger_, "DBus: Set param " << rules->name);
   switch (rules->type) {
-    case ford_message_descriptions::ParameterType::Array:
-      return SetArrayValue(
-          iter,
-          reinterpret_cast<const ford_message_descriptions::ArrayDescription*>(
-              rules),
-          param);
-      break;
-    case ford_message_descriptions::ParameterType::Struct:
-      return SetStructValue(
-          iter,
-          reinterpret_cast<const ford_message_descriptions::StructDescription*>(
-              rules),
-          param);
-      break;
+    case ford_message_descriptions::ParameterType::Array: {
+      const ford_message_descriptions::ArrayDescription *array_rules =
+          reinterpret_cast<const ford_message_descriptions::ArrayDescription*>(rules);
+      return SetArrayValue(iter, array_rules, param);
+    } break;
+    case ford_message_descriptions::ParameterType::Struct: {
+      const ford_message_descriptions::StructDescription *struct_rules =
+          reinterpret_cast<const ford_message_descriptions::StructDescription*>(rules);
+      return SetStructValue(iter, struct_rules, param);
+    } break;
     case ford_message_descriptions::ParameterType::Enum:
-    case ford_message_descriptions::ParameterType::Integer:
-      type = DBUS_TYPE_INT32;
-      integerValue = param.asInt();
-      value = &integerValue;
-      break;
-    case ford_message_descriptions::ParameterType::Float:
-      type = DBUS_TYPE_DOUBLE;
-      floatValue = param.asDouble();
-      value = &floatValue;
-      break;
-    case ford_message_descriptions::ParameterType::Boolean:
-      type = DBUS_TYPE_BOOLEAN;
-      booleanValue = param.asBool();
-      value = &booleanValue;
-      break;
-    case ford_message_descriptions::ParameterType::String:
-      type = DBUS_TYPE_STRING;
-      stringValue = param.asString().c_str();
-      value = &stringValue;
-      break;
+    case ford_message_descriptions::ParameterType::Integer: {
+      dbus_int32_t value = param.asInt();
+      return dbus_message_iter_append_basic(iter, DBUS_TYPE_INT32, &value);
+    } break;
+    case ford_message_descriptions::ParameterType::Float: {
+      double value = param.asDouble();
+      return dbus_message_iter_append_basic(iter, DBUS_TYPE_DOUBLE, &value);
+    } break;
+    case ford_message_descriptions::ParameterType::Boolean: {
+      dbus_bool_t value = param.asBool();
+      return dbus_message_iter_append_basic(iter, DBUS_TYPE_BOOLEAN, &value);
+    } break;
+    case ford_message_descriptions::ParameterType::String: {
+      std::string str = param.asString();
+      const char * value = str.c_str();
+      return dbus_message_iter_append_basic(iter, DBUS_TYPE_STRING, &value);
+    } break;
     default:
       LOG4CXX_ERROR(logger_, "DBus: Unknown type of argument");
       return false;
   }
-  return dbus_message_iter_append_basic(iter, type, value);
 }
 
 bool DBusAdapter::SetOptionalValue(

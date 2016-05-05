@@ -128,6 +128,9 @@ void DBusMessageAdapter::SubscribeTo() {
                                      "OnSystemInfoChanged");
   DBusMessageController::SubscribeTo("BasicCommunication", "OnPhoneCall");
   DBusMessageController::SubscribeTo("BasicCommunication", "OnEmergencyEvent");
+  DBusMessageController::SubscribeTo("BasicCommunication", "OnAwakeSDL");
+  DBusMessageController::SubscribeTo("BasicCommunication", "OnDeactivateHMI");
+  DBusMessageController::SubscribeTo("BasicCommunication", "OnEventChanged");
   DBusMessageController::SubscribeTo("TTS", "Started");
   DBusMessageController::SubscribeTo("TTS", "Stopped");
   DBusMessageController::SubscribeTo("TTS", "OnLanguageChange");
@@ -151,6 +154,11 @@ void DBusMessageAdapter::SubscribeTo() {
   DBusMessageController::SubscribeTo("VehicleInfo", "OnEngineTorque");
   DBusMessageController::SubscribeTo("VehicleInfo", "OnAccPedalPosition");
   DBusMessageController::SubscribeTo("VehicleInfo", "OnSteeringWheelAngle");
+  DBusMessageController::SubscribeTo("VehicleInfo", "OnECallInfo");
+  DBusMessageController::SubscribeTo("VehicleInfo", "OnAirbagStatus");
+  DBusMessageController::SubscribeTo("VehicleInfo", "OnAirbagStatus");
+  DBusMessageController::SubscribeTo("VehicleInfo", "OnEmergencyEvent");
+  DBusMessageController::SubscribeTo("VehicleInfo", "OnClusterModeStatus");
   DBusMessageController::SubscribeTo("VehicleInfo", "OnMyKey");
   DBusMessageController::SubscribeTo("Navigation", "OnTBTClientState");
   DBusMessageController::SubscribeTo("Navigation", "OnWayPointChange");
