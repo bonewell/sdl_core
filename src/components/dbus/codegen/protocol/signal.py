@@ -1,6 +1,6 @@
 from .composite import Composite
 from .argument import Argument, TypeArgument
-import structure
+from .structure import Structure
 
 class Signal(Composite):
     def __init__(self, adapter, info):
@@ -10,7 +10,7 @@ class Signal(Composite):
     def load(self):
         for x in self.adapter.functionParameters(self.info):
             arg = Argument(self.adapter, x, TypeArgument.Undefined)
-            arg.is_structure = structure.Structure.exist(arg.type())
+            arg.is_structure = Structure.exist(arg.type())
             self.elements.append(arg)
 
     def accept(self, v):
