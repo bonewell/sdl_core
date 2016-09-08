@@ -18,6 +18,7 @@ set (SOURCES
   src/on_service_deactivated_test.cc
   src/on_default_service_chosen_test.cc
   src/socket_channel_test.cc
+  src/integration_test.cc
 )
 
 set (LIBRARIES
@@ -26,6 +27,7 @@ set (LIBRARIES
   gmock_main
   vrmoduleplugin
   gcov
+  pthread
 )
 
 if (ENABLE_TEST_COV_COUNT)

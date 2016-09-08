@@ -32,6 +32,8 @@
 
 #include "vr_module/socket_channel.h"
 
+#include <string.h>
+
 #include "functional_module/settings.h"
 #include "net/connected_socket_impl.h"
 #include "utils/logger.h"

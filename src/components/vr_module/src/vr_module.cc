@@ -37,6 +37,8 @@
 #include "vr_module/commands/factory.h"
 #include "vr_module/event_engine/event_dispatcher.h"
 #include "vr_module/hmi_event.h"
+#include "vr_module/interface/hmi.pb.h"
+#include "vr_module/layer.h"
 #include "vr_module/mobile_event.h"
 //#include "protocol/common.h"
 #include "functional_module/plugin_manager.h"
@@ -56,6 +58,7 @@ PLUGIN_FACTORY(VRModule)
 
 VRModule::VRModule()
     : GenericModule(kModuleID),
+      layer_(0),
       proxy_(this),
       supported_(false),
       active_service_(0),
@@ -68,8 +71,9 @@ VRModule::VRModule()
   SubscribeToRpcMessages();
 }
 
-VRModule::VRModule(Channel* channel)
+VRModule::VRModule(Layer* layer, Channel* channel)
     : GenericModule(kModuleID),
+      layer_(layer),
       proxy_(this, channel),
       supported_(false),
       active_service_(0),

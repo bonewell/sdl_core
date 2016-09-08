@@ -50,6 +50,7 @@ namespace vr_module {
 typedef std::queue<protocol_handler::RawMessagePtr> ServiceMessageQueue;
 
 typedef Json::Value MessageFromMobile;
+class Layer;
 class Channel;
 
 class VRModule : public functional_modules::GenericModule,
@@ -57,7 +58,7 @@ class VRModule : public functional_modules::GenericModule,
     public threads::MessageLoopThread<ServiceMessageQueue>::Handler {
  public:
   VRModule();
-  explicit VRModule(Channel *channel);
+  VRModule(Layer *layer, Channel *channel);
   ~VRModule();
   virtual const functional_modules::PluginInfo& GetPluginInfo() const;
   virtual void Start();
@@ -169,6 +170,7 @@ class VRModule : public functional_modules::GenericModule,
 
   functional_modules::PluginInfo plugin_info_;
 
+  Layer* layer_;
   VRProxy proxy_;
   const commands::FactoryInterface* factory_;
   request_controller::RequestController request_controller_;
