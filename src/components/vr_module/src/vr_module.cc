@@ -38,7 +38,9 @@
 #include "vr_module/event_engine/event_dispatcher.h"
 #include "vr_module/hmi_event.h"
 #include "vr_module/interface/hmi.pb.h"
-#include "vr_module/layer.h"
+#ifdef BUILD_TESTS
+#  include "vr_module/plugin_sender.h"
+#endif  // BUILD_TESTS
 #include "vr_module/mobile_event.h"
 //#include "protocol/common.h"
 #include "functional_module/plugin_manager.h"
@@ -58,12 +60,12 @@ PLUGIN_FACTORY(VRModule)
 
 VRModule::VRModule()
     : GenericModule(kModuleID),
-      layer_(0),
       proxy_(this),
       supported_(false),
       active_service_(0),
       default_service_(0),
-      messages_from_mobile_service_("IncomingFromMobileRemoteService", this) {
+      messages_from_mobile_service_("IncomingFromMobileRemoteService", this),
+      next_correlation_id_(0) {
   factory_ = new commands::Factory(this);
   plugin_info_.name = "VRModulePlugin";
   plugin_info_.version = 1;
@@ -71,20 +73,23 @@ VRModule::VRModule()
   SubscribeToRpcMessages();
 }
 
-VRModule::VRModule(Layer* layer, Channel* channel)
+#ifdef BUILD_TESTS
+VRModule::VRModule(PluginSender* sender, Channel* channel)
     : GenericModule(kModuleID),
-      layer_(layer),
+      sender_(sender),
       proxy_(this, channel),
       supported_(false),
       active_service_(0),
       default_service_(0),
-      messages_from_mobile_service_("IncomingFromMobileRemoteService", this) {
+      messages_from_mobile_service_("IncomingFromMobileRemoteService", this),
+      next_correlation_id_(0) {
   factory_ = new commands::Factory(this);
   plugin_info_.name = "VRModulePlugin";
   plugin_info_.version = 1;
   plugin_info_.service_type = functional_modules::ServiceType::VR;
   SubscribeToRpcMessages();
 }
+#endif  // BUILD_TESTS
 
 VRModule::~VRModule() {
   delete factory_;
@@ -98,7 +103,9 @@ void VRModule::CheckSupport() {
 }
 
 void VRModule::OnReady() {
+#ifndef BUILD_TESTS
   CheckSupport();
+#endif  // BUILD_TESTS
 }
 
 void VRModule::OnReceived(const vr_hmi_api::ServiceMessage& message) {
@@ -157,10 +164,14 @@ bool VRModule::SendToMobile(
                                        data, size,
                                        protocol_handler::ServiceType::kVr);
 
+#ifdef BUILD_TESTS
+  sender_->SendMessageToRemoteMobileService(messageToMobile);
+#else  // BUILD_TESTS
   // TODO(VS): GenericModule may contain pointer to PluginManager(can be fixed if
   //           PluginManager will be redesigned from singleton)
   functional_modules::PluginManager::instance()
       ->SendMessageToRemoteMobileService(messageToMobile);
+#endif  // BUILD_TESTS
 
   return true;
 }

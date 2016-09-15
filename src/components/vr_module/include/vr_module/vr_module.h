@@ -50,15 +50,21 @@ namespace vr_module {
 typedef std::queue<protocol_handler::RawMessagePtr> ServiceMessageQueue;
 
 typedef Json::Value MessageFromMobile;
-class Layer;
 class Channel;
+#ifdef BUILD_TESTS
+class PluginSender;
+#endif  // BUILD_TESTS
 
 class VRModule : public functional_modules::GenericModule,
     public VRProxyListener, public ServiceModule,
     public threads::MessageLoopThread<ServiceMessageQueue>::Handler {
  public:
   VRModule();
-  VRModule(Layer *layer, Channel *channel);
+
+#ifdef BUILD_TESTS
+  VRModule(PluginSender *layer, Channel *channel);
+#endif  // BUILD_TESTS
+
   ~VRModule();
   virtual const functional_modules::PluginInfo& GetPluginInfo() const;
   virtual void Start();
@@ -82,8 +88,7 @@ class VRModule : public functional_modules::GenericModule,
       mobile_apis::HMILevel::eType old_level);
 
   virtual int32_t GetNextCorrelationID() {
-    static int32_t next_correlation_id = 1;
-    return next_correlation_id++;
+    return ++next_correlation_id_;
   }
 
   virtual void OnReady();
@@ -170,7 +175,9 @@ class VRModule : public functional_modules::GenericModule,
 
   functional_modules::PluginInfo plugin_info_;
 
-  Layer* layer_;
+#ifdef BUILD_TESTS
+  PluginSender* sender_;
+#endif  // BUILD_TESTS
   VRProxy proxy_;
   const commands::FactoryInterface* factory_;
   request_controller::RequestController request_controller_;
@@ -178,8 +185,13 @@ class VRModule : public functional_modules::GenericModule,
   int32_t active_service_;
   int32_t default_service_;
   threads::MessageLoopThread<ServiceMessageQueue> messages_from_mobile_service_;
+  int32_t next_correlation_id_;
 
   DISALLOW_COPY_AND_ASSIGN(VRModule);
+
+  FRIEND_TEST(IntegrationTest, SupportService);
+  FRIEND_TEST(IntegrationTest, OnRegisterService);
+  FRIEND_TEST(IntegrationTest, ActivateService);
 };
 
 EXPORT_FUNCTION(VRModule)

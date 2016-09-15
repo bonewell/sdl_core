@@ -30,20 +30,30 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef SRC_COMPONENTS_VR_MODULE_TEST_INCLUDE_MOCK_LAYER_H_
-#define SRC_COMPONENTS_VR_MODULE_TEST_INCLUDE_MOCK_LAYER_H_
+#ifndef SRC_COMPONENTS_VR_MODULE_INCLUDE_LAYER_H_
+#define SRC_COMPONENTS_VR_MODULE_INCLUDE_LAYER_H_
 
-#include "gmock/gmock.h"
-#include "vr_module/layer.h"
+#include "protocol/raw_message.h"
+
+namespace vr_mobile_api {
+class ServiceMessage;
+}  // namespace vr_mobile_api
 
 namespace vr_module {
 
-class MockLayer : public Layer {
+class PluginSender {
  public:
-  MOCK_METHOD1(Send,
-      bool(const vr_mobile_api::ServiceMessage& message));
+  virtual ~PluginSender() {
+  }
+
+  /**
+   * @brief Sends message to app remote service
+   * @param message that will be sent through ProtcolHandler
+   */
+  virtual void SendMessageToRemoteMobileService(
+      const protocol_handler::RawMessagePtr message) const = 0;
 };
 
 }  // namespace vr_module
 
-#endif  // SRC_COMPONENTS_VR_MODULE_TEST_INCLUDE_MOCK_LAYER_H_
+#endif  // SRC_COMPONENTS_VR_MODULE_INCLUDE_LAYER_H_

@@ -54,7 +54,8 @@ SocketChannel::SocketChannel()
 }
 
 SocketChannel::SocketChannel(net::ConnectedSocket *socket)
-    : socket_(socket) {
+    : socket_(socket),
+      port_(0) {
 }
 
 SocketChannel::~SocketChannel() {
