@@ -123,6 +123,26 @@ class VRModule : public functional_modules::GenericModule,
     supported_ = false;
   }
 
+  /**
+   * @brief Function for processing remote services messages
+   * @param message Message with supporting params received
+   * @return processing result
+   */
+  virtual void ProcessMessageFromRemoteMobileService(
+      const protocol_handler::RawMessagePtr message);
+
+  /**
+   * @brief Function for processing remote service starting
+   * @param connection_key Key of started session.
+   */
+  virtual void OnServiceStartedCallback(const uint32_t& connection_key);
+
+  /**
+   * @brief Function for processing remote service stoping
+   * @param connection_key Key of started session.
+   */
+  virtual void OnServiceEndedCallback(const uint32_t& connection_key);
+
  private:
   static const functional_modules::ModuleID kModuleID = 405;
 
@@ -153,26 +173,6 @@ class VRModule : public functional_modules::GenericModule,
    */
   void Handle(protocol_handler::RawMessagePtr message);
 
-  /**
-   * @brief Function for processing remote services messages
-   * @param message Message with supporting params received
-   * @return processing result
-   */
-  virtual void ProcessMessageFromRemoteMobileService(
-      const protocol_handler::RawMessagePtr message);
-
-  /**
-   * @brief Function for processing remote service starting
-   * @param connection_key Key of started session.
-   */
-  virtual void OnServiceStartedCallback(const uint32_t& connection_key);
-
-  /**
-   * @brief Function for processing remote service stoping
-   * @param connection_key Key of started session.
-   */
-  virtual void OnServiceEndedCallback(const uint32_t& connection_key);
-
   functional_modules::PluginInfo plugin_info_;
 
 #ifdef BUILD_TESTS
@@ -192,6 +192,8 @@ class VRModule : public functional_modules::GenericModule,
   FRIEND_TEST(IntegrationTest, SupportService);
   FRIEND_TEST(IntegrationTest, OnRegisterService);
   FRIEND_TEST(IntegrationTest, ActivateService);
+  FRIEND_TEST(IntegrationTest, OnDefaultServiceChosen);
+  FRIEND_TEST(IntegrationTest, OnDeactivateService);
 };
 
 EXPORT_FUNCTION(VRModule)

@@ -367,10 +367,12 @@ void VRModule::OnServiceEndedCallback(const uint32_t& connection_key) {
 }
 
 void VRModule::Start() {
+  LOG4CXX_AUTO_TRACE(logger_);
   proxy_.Start();
 }
 
 void VRModule::Stop() {
+  LOG4CXX_AUTO_TRACE(logger_);
   proxy_.Stop();
 }
 

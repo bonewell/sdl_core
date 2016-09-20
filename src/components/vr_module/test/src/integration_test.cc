@@ -48,228 +48,126 @@
 using ::testing::_;
 using ::testing::DoAll;
 using ::testing::Return;
+using ::testing::AnyOf;
 
 static const size_t kHeaderSize = 4;
 static const size_t kChunkSize = 1000;
 
 MATCHER_P(RawDataEq, message, ""){
-  static int number = 0;
-  std::string str;
-  message.SerializeToString(&str);
-  size_t total = str.size();
-  size_t header = (number == 0) ? kHeaderSize : 0;
-  size_t offset = kChunkSize * number;
-  size_t tail = offset + kChunkSize;
-  if (total > tail) {
-    ++number;
-  } else {
-    tail = total;
-    number = 0;
-  }
-  const UInt8* begin = reinterpret_cast<const UInt8*>(str.c_str() + offset);
-  const UInt8* end = reinterpret_cast<const UInt8*>(str.c_str() + tail);
-  const UInt8* output = arg + header + offset;
-  return std::equal(begin, end, output);
+static int number = 0;
+std::string str;
+message.SerializeToString(&str);
+size_t total = str.size();
+size_t header = (number == 0) ? kHeaderSize : 0;
+size_t offset = kChunkSize * number;
+size_t tail = offset + kChunkSize;
+if (total > tail) {
+  ++number;
+} else {
+  tail = total;
+  number = 0;
 }
-
-MATCHER_P(SendSizeEq, message, ""){
-  std::string str;
-  message.SerializeToString(&str);
-  size_t total = str.size() + kHeaderSize;
-  return arg == kChunkSize || arg == total % kChunkSize;
-}
-
-MATCHER_P(RecvSizeEq, message, ""){
-  std::string str;
-  message.SerializeToString(&str);
-  size_t total = str.size();
-  return arg == kHeaderSize || arg == kChunkSize || arg == total % kChunkSize;
+const UInt8* begin = reinterpret_cast<const UInt8*>(str.c_str() + offset);
+const UInt8* end = reinterpret_cast<const UInt8*>(str.c_str() + tail);
+const UInt8* output = arg + header + offset;
+return std::equal(begin, end, output);
 }
 
 MATCHER_P2(RawMessageEq, service, message, ""){
-  const size_t size = message.ByteSize();
-  uint8_t* data = new uint8_t[size];
-  message.SerializeToArray(data, size);
-  uint8_t header_size = protocol_handler::PROTOCOL_HEADER_V2_SIZE;
-  return arg->connection_key() == uint32_t(service)
-      && arg->protocol_version() == uint32_t(protocol_handler::PROTOCOL_VERSION_2)
-      && arg->service_type() == uint32_t(protocol_handler::ServiceType::kVr)
-      && arg->data_size() == header_size + size
-      && std::equal(data, data + size, arg->data() + header_size);
+const size_t size = message.ByteSize();
+uint8_t data[size];
+message.SerializeToArray(data, size);
+return arg->connection_key() == uint32_t(service)
+&& arg->protocol_version() == uint32_t(protocol_handler::PROTOCOL_VERSION_2)
+&& arg->service_type() == uint32_t(protocol_handler::ServiceType::kVr)
+&& arg->data_size() == size
+&& std::equal(data, data + size, arg->data());
 }
 
-ACTION_P2(CallSendRequest, message, sync){
-  static int count = 0;
-  std::string str;
-  message.SerializeToString(&str);
-  size_t total = str.size() + kHeaderSize;
-  size_t offset = kChunkSize * (count + 1);
-  if (total > offset) {
-    ++count;
-    return kChunkSize;
-  } else {
-    size_t size = total - kChunkSize * count;
-    sync->Resume();
-    return size;
-  }
+ACTION_P2(RecvRawMessage, module, message){
+uint32_t size = message.ByteSize();
+uint8_t data[size];
+message.SerializeToArray(data, size);
+protocol_handler::RawMessagePtr raw(new protocol_handler::RawMessage(1,
+        protocol_handler::PROTOCOL_VERSION_2,
+        data, size,
+        protocol_handler::ServiceType::kVr));
+module->ProcessMessageFromRemoteMobileService(raw);
 }
 
-ACTION_P(CallSendNotification, message){
-  static int count = 0;
-  std::string str;
-  message.SerializeToString(&str);
-  size_t total = str.size() + kHeaderSize;
-  size_t offset = kChunkSize * (count + 1);
-  if (total > offset) {
-    ++count;
-    return kChunkSize;
-  } else {
-    size_t size = total - kChunkSize * count;
-    return size;
-  }
+ACTION_P(RecvHeader, header){
+UInt8* buffer = const_cast<UInt8*>(arg0);
+std::copy(header, header + kHeaderSize, buffer);
+return kHeaderSize;
 }
 
-ACTION_P3(CallRecvResponse, header, message, sync){
-  static int recv_count = 0;
-  if (recv_count == 0) {
-    sync->Pause();
-  }
-  UInt8* arg = const_cast<UInt8*>(arg0);
-  std::string str;
-  message.SerializeToString(&str);
-  if (recv_count == -1) {
-    const UInt8* begin = reinterpret_cast<const UInt8*>(str.c_str());
-    const UInt8* end = reinterpret_cast<const UInt8*>(str.c_str());
-    std::copy(begin, end, arg);
-    return 0;
-  }
-  if (recv_count == 0) {
-    ++recv_count;
-    const UInt8* begin = header;
-    const UInt8* end = header + kHeaderSize;
-    std::copy(begin, end, arg);
-    return kHeaderSize;
-  }
-  size_t total = str.size();
-  size_t offset = kChunkSize * (recv_count - 1);
-  if (total > offset + kChunkSize) {
-    ++recv_count;
-    const UInt8* begin = reinterpret_cast<const UInt8*>(str.c_str() + offset);
-    const UInt8* end = reinterpret_cast<const UInt8*>(str.c_str() + offset
-        + kChunkSize);
-    std::copy(begin, end, arg);
-    return kChunkSize;
-  } else {
-    size_t size = total - offset;
-    recv_count = -1;
-    const UInt8* begin = reinterpret_cast<const UInt8*>(str.c_str() + offset);
-    const UInt8* end = reinterpret_cast<const UInt8*>(str.c_str() + offset
-        + size);
-    std::copy(begin, end, arg);
-    sync->Stop();
-    return size;
-  }
+ACTION_P(RecvMessage, message){
+UInt8* buffer = const_cast<UInt8*>(arg0);
+std::string str;
+message.SerializeToString(&str);
+size_t size = str.size();
+const UInt8* begin = reinterpret_cast<const UInt8*>(str.c_str());
+const UInt8* end = reinterpret_cast<const UInt8*>(str.c_str() + size);
+std::copy(begin, end, buffer);
+return size;
 }
 
-ACTION_P2(CallRecvRequest, header, message){
-  static int recv_count = 0;
-  UInt8* arg = const_cast<UInt8*>(arg0);
-  std::string str;
-  message.SerializeToString(&str);
-  if (recv_count == -1) {
-    const UInt8* begin = reinterpret_cast<const UInt8*>(str.c_str());
-    const UInt8* end = reinterpret_cast<const UInt8*>(str.c_str());
-    std::copy(begin, end, arg);
-    return 0;
-  }
-  if (recv_count == 0) {
-    ++recv_count;
-    const UInt8* begin = header;
-    const UInt8* end = header + kHeaderSize;
-    std::copy(begin, end, arg);
-    return kHeaderSize;
-  }
-  size_t total = str.size();
-  size_t offset = kChunkSize * (recv_count - 1);
-  if (total > offset + kChunkSize) {
-    ++recv_count;
-    const UInt8* begin = reinterpret_cast<const UInt8*>(str.c_str() + offset);
-    const UInt8* end = reinterpret_cast<const UInt8*>(str.c_str() + offset
-        + kChunkSize);
-    std::copy(begin, end, arg);
-    return kChunkSize;
-  } else {
-    size_t size = total - offset;
-    recv_count = -1;
-    const UInt8* begin = reinterpret_cast<const UInt8*>(str.c_str() + offset);
-    const UInt8* end = reinterpret_cast<const UInt8*>(str.c_str() + offset
-        + size);
-    std::copy(begin, end, arg);
-    return size;
-  }
+ACTION(SizeHeader){
+return kHeaderSize;
+}
+
+ACTION_P(SizeMessage, message){
+return message.ByteSize() + kHeaderSize;
+}
+
+ACTION_P(Lock, mutex){
+mutex->Lock();
+return 0;
+}
+
+ACTION_P(Unlock, mutex){
+mutex->Unlock();
 }
 
 namespace vr_module {
 
-struct Synchronizer {
-  pthread_mutex_t m1 = PTHREAD_MUTEX_INITIALIZER;
-  pthread_mutex_t m2 = PTHREAD_MUTEX_INITIALIZER;
-  void Start() {
-    pthread_mutex_lock(&m1);
-    pthread_mutex_lock(&m2);
+struct Mutex {
+  pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+  void Lock() {
+    pthread_mutex_lock(&m);
   }
-  void Wait(int seconds) {
-    timespec timestamp;
-    clock_gettime(CLOCK_REALTIME, &timestamp);
-    timestamp.tv_sec += seconds;
-    pthread_mutex_timedlock(&m1, &timestamp);
-    pthread_mutex_timedlock(&m2, &timestamp);
-    pthread_mutex_unlock(&m2);
-    pthread_mutex_unlock(&m1);
+  void Try(int seconds = 0) {
+    if (seconds < 1) {
+      timespec timestamp;
+      clock_gettime(CLOCK_REALTIME, &timestamp);
+      timestamp.tv_sec += seconds;
+      pthread_mutex_timedlock(&m, &timestamp);
+    } else {
+      pthread_mutex_trylock(&m);
+    }
   }
-  void Stop() {
-    pthread_mutex_unlock(&m1);
-    pthread_mutex_unlock(&m2);
-  }
-  void Pause() {
-    pthread_mutex_lock(&m2);
-  }
-  void Resume() {
-    pthread_mutex_unlock(&m2);
+  void Unlock() {
+    pthread_mutex_unlock(&m);
   }
 };
 
 class IntegrationTest : public ::testing::Test {
  protected:
-  int CountSendChunks(const vr_hmi_api::ServiceMessage& message) {
-    std::string str;
-    message.SerializeToString(&str);
-    size_t total = str.size() + kHeaderSize;
-    size_t n = (total / kChunkSize) + (total % kChunkSize ? 1 : 0);
-    return n;
-  }
-  int CountRecvChunks(const vr_hmi_api::ServiceMessage& message) {
-    std::string str;
-    message.SerializeToString(&str);
-    size_t total = str.size();
-    size_t n = (total / kChunkSize) + (total % kChunkSize ? 1 : 0);
-    return n + 1;
-  }
 };
 
 TEST_F(IntegrationTest, SupportService) {
   MockPluginSender sender;
   net::MockConnectedSocket* socket = new net::MockConnectedSocket();
   VRModule module(&sender, new SocketChannel(socket));
-  Synchronizer sync;
+  Mutex mtx, mtx_net;
 
   vr_hmi_api::ServiceMessage support_out;
   support_out.set_rpc(vr_hmi_api::SUPPORT_SERVICE);
   support_out.set_rpc_type(vr_hmi_api::REQUEST);
   support_out.set_correlation_id(1);
-  EXPECT_CALL(*socket, send(RawDataEq(support_out), SendSizeEq(support_out), _))
-      .Times(CountSendChunks(support_out)).WillRepeatedly(
-      CallSendRequest(support_out, &sync));
+  EXPECT_CALL(*socket, send(RawDataEq(support_out),
+          kHeaderSize + support_out.ByteSize(), _)).Times(1).WillOnce(
+      DoAll(Unlock(&mtx), SizeMessage(support_out)));
 
   vr_hmi_api::ServiceMessage support_in;
   support_in.set_rpc(vr_hmi_api::SUPPORT_SERVICE);
@@ -280,16 +178,18 @@ TEST_F(IntegrationTest, SupportService) {
   std::string params;
   body.SerializeToString(&params);
   support_in.set_params(params);
-  UInt8 header[kHeaderSize] = { 10, 0, 0, 0 };
-  EXPECT_CALL(*socket, recv(_, RecvSizeEq(support_in), _)).WillRepeatedly(
-      CallRecvResponse(header, support_in, &sync));
-  EXPECT_CALL(*socket, shutdown()).Times(1);
+  UInt8 header[kHeaderSize] = { 0, 0, 0, 10 };
+  EXPECT_CALL(*socket, recv(_, AnyOf(kHeaderSize, support_in.ByteSize()), _)).
+      Times(3).WillOnce(RecvHeader(header)).WillOnce(RecvMessage(support_in))
+      .WillOnce(Lock(&mtx_net));
+  EXPECT_CALL(*socket, shutdown()).Times(1).WillOnce(Unlock(&mtx_net));
   EXPECT_CALL(*socket, close()).Times(1);
 
-  sync.Start();
+  EXPECT_FALSE(module.IsSupported());
+  mtx_net.Lock();
   module.Start();
   module.CheckSupport();
-  sync.Wait(10);
+  mtx.Try(10);
   sleep(1);
   EXPECT_TRUE(module.IsSupported());
 }
@@ -310,8 +210,8 @@ TEST_F(IntegrationTest, OnRegisterService) {
   notification.SerializeToString(&params);
   on_register_out.set_params(params);
   EXPECT_CALL(*socket, send(RawDataEq(on_register_out),
-          SendSizeEq(on_register_out), _)).WillRepeatedly(
-      CallSendNotification(on_register_out));
+          kHeaderSize + on_register_out.ByteSize(), _)).Times(1).WillOnce(
+      SizeMessage(on_register_out));
   EXPECT_CALL(*socket, close()).Times(1);
 
   module.supported_ = true;
@@ -322,7 +222,7 @@ TEST_F(IntegrationTest, ActivateService) {
   MockPluginSender sender;
   net::MockConnectedSocket* socket = new net::MockConnectedSocket();
   VRModule module(&sender, new SocketChannel(socket));
-  Synchronizer sync;
+  Mutex mtx, mtx_net;
 
   vr_hmi_api::ServiceMessage activate_in;
   activate_in.set_rpc(vr_hmi_api::ACTIVATE);
@@ -333,23 +233,118 @@ TEST_F(IntegrationTest, ActivateService) {
   std::string params;
   request.SerializeToString(&params);
   activate_in.set_params(params);
-  UInt8 header[kHeaderSize] = { 10, 0, 0, 0 };
-  EXPECT_CALL(*socket, recv(_, RecvSizeEq(activate_in), _)).WillRepeatedly(
-      CallRecvRequest(header, activate_in));
+  UInt8 header[kHeaderSize] = { 0, 0, 0, 10 };
+  EXPECT_CALL(*socket, recv(_, AnyOf(kHeaderSize, activate_in.ByteSize()), _)).
+      Times(3).WillOnce(RecvHeader(header)).WillOnce(RecvMessage(activate_in))
+      .WillOnce(Lock(&mtx_net));
 
   vr_mobile_api::ServiceMessage activate_to;
   activate_to.set_rpc(vr_mobile_api::ACTIVATE);
   activate_to.set_rpc_type(vr_mobile_api::REQUEST);
   activate_to.set_correlation_id(1);
-  EXPECT_CALL(sender,
-      SendMessageToRemoteMobileService(RawMessageEq(1, activate_to))).Times(1);
-  EXPECT_CALL(*socket, shutdown()).Times(1);
+
+  vr_mobile_api::ServiceMessage activate_from;
+  activate_from.set_rpc(vr_mobile_api::ACTIVATE);
+  activate_from.set_rpc_type(vr_mobile_api::RESPONSE);
+  activate_from.set_correlation_id(1);
+  vr_mobile_api::ActivateServiceResponse response;
+  response.set_result(vr_mobile_api::SUCCESS);
+  std::string params2;
+  response.SerializeToString(&params2);
+  activate_from.set_params(params2);
+  EXPECT_CALL(sender, SendMessageToRemoteMobileService(
+          RawMessageEq(1, activate_to))).Times(1).WillOnce(
+      RecvRawMessage(&module, activate_from));
+
+  vr_hmi_api::ServiceMessage activate_out;
+  activate_out.set_rpc(vr_hmi_api::ACTIVATE);
+  activate_out.set_rpc_type(vr_hmi_api::RESPONSE);
+  activate_out.set_correlation_id(10);
+  vr_hmi_api::ActivateServiceResponse response2;
+  response2.set_result(vr_hmi_api::SUCCESS);
+  std::string params3;
+  response2.SerializeToString(&params3);
+  activate_out.set_params(params3);
+  EXPECT_CALL(*socket, send(RawDataEq(activate_out),
+          kHeaderSize + activate_out.ByteSize(), _)
+  ).Times(1).WillOnce(DoAll(Unlock(&mtx), SizeMessage(activate_out)));
+  EXPECT_CALL(*socket, shutdown()).Times(1).WillOnce(Unlock(&mtx_net));
   EXPECT_CALL(*socket, close()).Times(1);
 
-  sync.Start();
+  mtx.Lock();
   module.supported_ = true;
+  EXPECT_FALSE(module.HasActivatedService());
+  mtx_net.Lock();
   module.Start();
-  sync.Wait(10);
+  mtx.Try(10);
+  sleep(1);
+  EXPECT_TRUE(module.HasActivatedService());
+  EXPECT_EQ(1, module.active_service_);
+}
+
+TEST_F(IntegrationTest, OnDefaultServiceChosen) {
+  MockPluginSender sender;
+  net::MockConnectedSocket* socket = new net::MockConnectedSocket();
+  VRModule module(&sender, new SocketChannel(socket));
+  Mutex mtx;
+
+  vr_hmi_api::ServiceMessage on_default_in;
+  on_default_in.set_rpc(vr_hmi_api::ON_DEFAULT_CHOSEN);
+  on_default_in.set_rpc_type(vr_hmi_api::NOTIFICATION);
+  on_default_in.set_correlation_id(10);
+  vr_hmi_api::OnDefaultServiceChosenNotification notification;
+  notification.set_appid(1);
+  std::string params;
+  notification.SerializeToString(&params);
+  on_default_in.set_params(params);
+  UInt8 header[kHeaderSize] = { 0, 0, 0, 10 };
+  EXPECT_CALL(*socket, recv(_, AnyOf(kHeaderSize, on_default_in.ByteSize()), _))
+      .Times(3).WillOnce(RecvHeader(header)).WillOnce(
+      RecvMessage(on_default_in)).WillOnce(Lock(&mtx));
+  EXPECT_CALL(*socket, shutdown()).Times(1).WillOnce(Unlock(&mtx));
+  EXPECT_CALL(*socket, close()).Times(1);
+
+  module.supported_ = true;
+  mtx.Lock();
+  module.Start();
+  sleep(1);
+  EXPECT_TRUE(module.IsDefaultService(1));
+}
+
+TEST_F(IntegrationTest, OnDeactivateService) {
+  MockPluginSender sender;
+  net::MockConnectedSocket* socket = new net::MockConnectedSocket();
+  VRModule module(&sender, new SocketChannel(socket));
+  Mutex mtx, mtx_net;
+
+  vr_hmi_api::ServiceMessage on_deactivate_in;
+  on_deactivate_in.set_rpc(vr_hmi_api::ON_DEACTIVATED);
+  on_deactivate_in.set_rpc_type(vr_hmi_api::NOTIFICATION);
+  on_deactivate_in.set_correlation_id(10);
+  UInt8 header[kHeaderSize] = { 0, 0, 0, 6 };
+  EXPECT_CALL(*socket, recv(_, AnyOf(kHeaderSize, on_deactivate_in.ByteSize()), _))
+      .Times(3).WillOnce(RecvHeader(header)).WillOnce(
+      RecvMessage(on_deactivate_in)).WillOnce(Lock(&mtx_net));
+
+  vr_mobile_api::ServiceMessage on_deactivate_to;
+  on_deactivate_to.set_rpc(vr_mobile_api::ON_DEACTIVATED);
+  on_deactivate_to.set_rpc_type(vr_mobile_api::NOTIFICATION);
+  on_deactivate_to.set_correlation_id(1);
+  EXPECT_CALL(sender, SendMessageToRemoteMobileService(
+          RawMessageEq(1, on_deactivate_to))).Times(1).WillOnce(Unlock(&mtx));
+  EXPECT_CALL(*socket, shutdown()).Times(1).WillOnce(Unlock(&mtx_net));
+  EXPECT_CALL(*socket, close()).Times(1);
+
+  mtx.Lock();
+  module.supported_ = true;
+  module.active_service_ = 1;
+  EXPECT_TRUE(module.HasActivatedService());
+  mtx_net.Lock();
+  module.Start();
+  mtx.Try(10);
+  sleep(1);
+  EXPECT_FALSE(module.HasActivatedService());
+  EXPECT_EQ(0, module.active_service_);
 }
 
 }  // namespace vr_module
